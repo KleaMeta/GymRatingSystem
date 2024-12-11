@@ -8,6 +8,12 @@ import java.sql.SQLException;
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Font;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -18,15 +24,17 @@ public class Main {
 	// As of yet the database has only been hosted locally, so these values are subject to change across devices.
 	// If you're using MySQL to host the database, the URL will be "jdbc:mysql://localhost:3306/gym_rating_system".
 	// The User and Password depend on your configuration of MySQL upon installation.
-	static final String URL = "";
-	static final String USER = "";
-	static final String PASSWORD = "";
+	static final String URL = "jdbc:mysql://localhost:3306/gym_rating_system";
+	static final String USER = "root";
+	static final String PASSWORD = "SkibidiSigmas23!V5";
 	// For obvious reasons the method for getting the password should be made more secure but I can't think of any good way to do that that wouldn't be overkill for this project.
 	
 	static Connection connection;
 	static Statement statement;
 	
+	static Scene scene;
 	static User user;
+	static int gymId;
 	
 	// Reformats the string to be handled safely in SQL.
 	static String safeFormat(String string) {
@@ -43,8 +51,7 @@ public class Main {
 		statement = connection.createStatement();
 		user = null;
 		
-		// openWindowContext();
-		openCommandContext();
+		openWindowContext();
 	}
 	
 	public static void openCommandContext() throws SQLException {
@@ -272,58 +279,523 @@ public class Main {
 		}
 	}
 	
-	// A placeholder. For now all functionality is implemented in the Command Context and a proper GUI for it will be created later.
-	public static void openWindowContext() {
-		JFrame window = new JFrame();
-		
-		DefaultTableModel model = new DefaultTableModel() {
-			@Override
-			public boolean isCellEditable(int row, int column) {
-				return false;
-			}
-		};
-		JTable output = new JTable();
-		output.setModel(model);
-		
-		JScrollPane scroll = new JScrollPane(output);
-		scroll.setVisible(true);
-		
-		JTextField input = new JTextField();
-		input.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				try {
-					ResultSet result = statement.executeQuery(input.getText());
-					ResultSetMetaData metadata = result.getMetaData();
-					int cols = metadata.getColumnCount();
-					model.setColumnCount(0);
-					model.setRowCount(0);
-					for (int i = 1; i <= cols; ++i) {
-						model.addColumn(metadata.getColumnName(i));
-					}
-					while (result.next()) {
-						String[] rowData = new String[cols];
-						for (int i = 0; i < cols; ++i) {
-							rowData[i] = result.getString(i+1);
+	public static void loadScene(JFrame window, Scene newScene) {
+		// Clear window.
+		Container pane = window.getContentPane();
+		while (pane.getComponentCount() > 0) { pane.remove(0); }
+		window.setContentPane(new JPanel(null));
+		int width = window.getWidth() - 13; // Real width of displayed window.
+		int height = window.getHeight() - 35; // Real height of displayed window.
+		scene = newScene;
+		switch (newScene) {
+			case Login -> {
+				JLabel emailLabel = new JLabel();
+				emailLabel.setText("Enter your email:");
+				emailLabel.setBounds(width / 2 - 80, height / 4, 160, 20);
+				window.add(emailLabel);
+				
+				JTextField emailField = new JTextField();
+				emailField.setBounds(width / 2 - 80, height / 4 + 20, 160, 20);
+				window.add(emailField);
+
+				JLabel passwordLabel = new JLabel();
+				passwordLabel.setText("Enter your password:");
+				passwordLabel.setBounds(width / 2 - 80, height / 4 + 40, 160, 20);
+				window.add(passwordLabel);
+				
+				JPasswordField passwordField = new JPasswordField();
+				passwordField.setBounds(width / 2 - 80, height / 4 + 60, 160, 20);
+				window.add(passwordField);
+				
+				JLabel errorLabel = new JLabel();
+				errorLabel.setText("");
+				errorLabel.setBounds(width / 2 - 100, height / 4 + 140, 200, 20);
+				errorLabel.setForeground(Color.RED);
+				window.add(errorLabel);
+				
+				JButton loginButton = new JButton();
+				loginButton.setText("Log In");
+				loginButton.setBounds(width / 2 - 80, height / 4 + 100, 160, 20);
+				loginButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						String email = emailField.getText();
+						String password = new String(passwordField.getPassword());
+						try {
+							ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email=\""+safeFormat(email)+"\"");
+							if (!result.next()) {
+								errorLabel.setText("No user with matching email found.");
+								return;
+							}
+							if (!hash(password).equals(result.getString(3))) {
+								errorLabel.setText("Incorrect password.");
+								return;
+							}
+							user = new User((int)result.getObject(1), (String)result.getObject(2), (String)result.getObject(4), (boolean)result.getObject(5));
+							result.close();
+						} catch (SQLException ex) {
+							errorLabel.setText("Connection failure.");
+							return;
 						}
-						model.addRow(rowData);
+						errorLabel.setText("Success!");
+						errorLabel.setForeground(Color.GREEN);
+						loadScene(window, Scene.Home);
 					}
-					output.revalidate();
-					input.setText("");
+				});
+				window.add(loginButton);
+
+				JLabel registerLabel1 = new JLabel();
+				registerLabel1.setText("No account?");
+				registerLabel1.setBounds(width / 2 - 80, height * 3 / 4, 160, 20);
+				window.add(registerLabel1);
+
+				JLabel registerLabel2 = new JLabel();
+				registerLabel2.setText("Click here to make one:");
+				registerLabel2.setBounds(width / 2 - 80, height * 3 / 4 + 20, 160, 20);
+				window.add(registerLabel2);
+				
+				JButton registerButton = new JButton();
+				registerButton.setText("Register");
+				registerButton.setBounds(width / 2 - 80, height * 3 / 4 + 40, 160, 20);
+				registerButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.Register);
+					}
+				});
+				window.add(registerButton);
+				
+				JLabel continueLabel = new JLabel();
+				continueLabel.setText("Or continue without one:");
+				continueLabel.setBounds(width / 2 - 80, height * 3 / 4 + 60, 160, 20);
+				window.add(continueLabel);
+				
+				JButton continueButton = new JButton();
+				continueButton.setText("Continue");
+				continueButton.setBounds(width / 2 - 80, height * 3 / 4 + 80, 160, 20);
+				continueButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.HomeNoUser);
+					}
+				});
+				window.add(continueButton);
+			}
+			case Register -> {
+				JLabel emailLabel = new JLabel();
+				emailLabel.setText("Enter your email:");
+				emailLabel.setBounds(width / 2 - 80, height / 4, 160, 20);
+				window.add(emailLabel);
+				
+				JTextField emailField = new JTextField();
+				emailField.setBounds(width / 2 - 80, height / 4 + 20, 160, 20);
+				window.add(emailField);
+
+				JLabel passwordLabel = new JLabel();
+				passwordLabel.setText("Enter a password:");
+				passwordLabel.setBounds(width / 2 - 80, height / 4 + 40, 160, 20);
+				window.add(passwordLabel);
+				
+				JPasswordField passwordField = new JPasswordField();
+				passwordField.setBounds(width / 2 - 80, height / 4 + 60, 160, 20);
+				window.add(passwordField);
+
+				JLabel zipcodeLabel = new JLabel();
+				zipcodeLabel.setText("Enter your Zip Code:");
+				zipcodeLabel.setBounds(width / 2 - 80, height / 4 + 80, 160, 20);
+				window.add(zipcodeLabel);
+				
+				JTextField zipcodeField = new JTextField();
+				zipcodeField.setBounds(width / 2 - 80, height / 4 + 100, 160, 20);
+				window.add(zipcodeField);
+				
+				JLabel errorLabel = new JLabel();
+				errorLabel.setText("");
+				errorLabel.setBounds(width / 2 - 100, height / 4 + 160, 200, 20);
+				errorLabel.setForeground(Color.RED);
+				window.add(errorLabel);
+				
+				JButton registerButton = new JButton();
+				registerButton.setText("Register");
+				registerButton.setBounds(width / 2 - 80, height / 4 + 140, 160, 20);
+				registerButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						String email = emailField.getText();
+						String password = new String(passwordField.getPassword());
+						String zipcode = zipcodeField.getText();
+						try {
+							ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email='"+safeFormat(email)+"'");
+							if (result.next()) {
+								errorLabel.setText("A user with this email already exists.");
+								return;
+							}
+							statement.executeUpdate("INSERT INTO users (email, password, zip_code) VALUES ('"+safeFormat(email)+"', '"+safeFormat(hash(password))+"', '"+safeFormat(zipcode)+"')");
+							
+						} catch (SQLException ex) {
+							errorLabel.setText("Connection failure.");
+							return;
+						}
+						errorLabel.setText("Success!");
+						errorLabel.setForeground(Color.GREEN);
+						loadScene(window, Scene.Login);
+					}
+				});
+				
+				JButton backButton = new JButton();
+				backButton.setText("Go Back");
+				backButton.setBounds(width / 2 - 80, height * 3 / 4, 160, 20);
+				backButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.Login);
+					}
+				});
+				window.add(backButton);
+			}
+			case Home -> {
+				JButton accountButton = new JButton();
+				accountButton.setText("Manage Account");
+				accountButton.setBounds(width - 160, 0, 160, 40);
+				accountButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.Account);
+					}
+				});
+				window.add(accountButton);
+
+				JButton logoutButton = new JButton();
+				logoutButton.setText("Log Out");
+				logoutButton.setBounds(width - 160, 40, 160, 40);
+				logoutButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						user = null;
+						loadScene(window, Scene.Login);
+					}
+				});
+				window.add(logoutButton);
+				
+				if (user.isAdmin()) {
+					JButton adminButton = new JButton();
+					adminButton.setText("Admin Tools");
+					adminButton.setBounds(width - 160, 100, 160, 40);
+					adminButton.addActionListener(new ActionListener() {
+						@Override
+						public void actionPerformed(ActionEvent e) {
+							user = null;
+							loadScene(window, Scene.AdminTools);
+						}
+					});
+					window.add(adminButton);
+				}
+				
+				JButton gymsInZipCodeButton = new JButton();
+				gymsInZipCodeButton.setText("Gyms in your Zip Code");
+				gymsInZipCodeButton.setBounds(width / 4 - 80, height * 3 / 4 - 20, 160, 40);
+				window.add(gymsInZipCodeButton);
+				
+				JButton searchButton = new JButton();
+				searchButton.setText("Search for Gyms");
+				searchButton.setBounds(width / 2 - 80, height * 3 / 4 - 20, 160, 40);
+				searchButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.GymSearch);
+					}
+				});
+				window.add(searchButton);
+			}
+			case HomeNoUser -> {
+				JButton loginButton = new JButton();
+				loginButton.setText("Log In");
+				loginButton.setBounds(width - 160, 0, 160, 40);
+				loginButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.Login);
+					}
+				});
+				window.add(loginButton);
+				
+				JButton searchButton = new JButton();
+				searchButton.setText("Search for Gyms");
+				searchButton.setBounds(width / 2 - 80, height * 3 / 4 - 20, 160, 40);
+				searchButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scene.GymSearch);
+					}
+				});
+				window.add(searchButton);
+			}
+			case GymSearch -> {
+				JPanel listPanel = new JPanel();
+				listPanel.setLayout(null);
+				
+				JScrollPane scrollPane = new JScrollPane(listPanel);
+				scrollPane.setBounds(0, 80, width, height - 80);
+				scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+				scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+				scrollPane.setMaximumSize(new Dimension(width, height - 80));
+				window.add(scrollPane);
+				
+				JLabel searchLabel = new JLabel();
+				searchLabel.setText("Enter zip code, name, or desired equipment:");
+				searchLabel.setBounds(0, 0, width, 40);
+				window.add(searchLabel);
+				
+				JButton backButton = new JButton();
+				backButton.setText("Back");
+				backButton.setBounds(width - 160, 0, 160, 40);
+				backButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						if (user == null) {
+							loadScene(window, Scene.HomeNoUser);
+						} else {
+							loadScene(window, Scene.Home);
+						}
+					}
+				});
+				window.add(backButton);
+				
+				JTextField searchField = new JTextField();
+				searchField.setBounds(0, 40, width, 40);
+				searchField.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						listPanel.removeAll();
+						
+						int y = 0;
+						try {
+							ResultSet result = statement.executeQuery("SELECT id, name, address FROM gyms WHERE zip_code='"+searchField.getText()+"' OR name LIKE '%"+searchField.getText()+"%' OR type LIKE '%"+searchField.getText()+"%'");
+							while (result.next()) {
+								JLabel gymName = new JLabel();
+								gymName.setText(result.getString(2));
+								gymName.setBounds(20, 10 + y, width, 20);
+								listPanel.add(gymName);
+								
+								JLabel gymAddress = new JLabel();
+								gymAddress.setText(result.getString(3));
+								gymAddress.setBounds(20, 30 + y, width, 20);
+								listPanel.add(gymAddress);
+
+								int id = (int)result.getObject(1);
+								JButton viewButton = new JButton();
+								viewButton.setText("Details");
+								if (user == null || !user.isAdmin()) {
+									viewButton.setBounds(width - 160, 10 + y, 120, 40);
+								} else {
+									viewButton.setBounds(width - 240, 10 + y, 120, 40);
+								}
+								viewButton.addActionListener(new ActionListener() {
+									@Override
+									public void actionPerformed(ActionEvent e) {
+										gymId = id;
+										loadScene(window, Scene.GymDetails);
+									}
+								});
+								listPanel.add(viewButton);
+								
+								if (user != null && user.isAdmin()) {
+									JButton editButton = new JButton();
+									editButton.setText("Edit");
+									editButton.setBounds(width - 120, 10 + y, 80, 20);
+									editButton.addActionListener(new ActionListener() {
+										@Override
+										public void actionPerformed(ActionEvent e) {
+											gymId = id;
+											loadScene(window, Scene.GymEdit);
+										}
+									});
+									listPanel.add(editButton);
+									
+									JButton deleteButton = new JButton();
+									deleteButton.setText("Delete");
+									deleteButton.setBounds(width - 120, 30 + y, 80, 20);
+									deleteButton.addActionListener(new ActionListener() {
+										@Override
+										public void actionPerformed(ActionEvent e) {
+											try {
+												statement.executeUpdate("DELETE FROM gyms WHERE id="+id);
+											} catch (SQLException ex) {
+												
+											}
+											loadScene(window, Scene.GymSearch);
+										}
+									});
+									listPanel.add(deleteButton);
+								}
+								
+								y += 60;
+							}
+						} catch (SQLException ex) {
+							ex.printStackTrace();
+						}
+						
+						listPanel.setPreferredSize(new Dimension(width, y));
+						listPanel.revalidate();
+						listPanel.repaint();
+						
+						scrollPane.setViewportView(listPanel);
+						scrollPane.revalidate();
+						scrollPane.repaint();
+						
+						window.revalidate();
+					}
+				});
+				window.add(searchField);
+			}
+			case GymDetails -> {
+				JButton backButton = new JButton();
+				backButton.setText("Home");
+				backButton.setBounds(width - 160, 0, 160, 40);
+				backButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						if (user == null) {
+							loadScene(window, Scene.HomeNoUser);
+						} else {
+							loadScene(window, Scene.Home);
+						}
+					}
+				});
+				window.add(backButton);
+				
+				ResultSet gymResult, reviewResult, userResult;
+				try {
+					gymResult = statement.executeQuery("SELECT name, address, zip_code, type, hours, equipment FROM gyms WHERE id="+gymId);
+					if (!gymResult.next()) {
+						JLabel errorLabel = new JLabel();
+						errorLabel.setText("Connection failed.");
+						errorLabel.setForeground(Color.RED);
+						errorLabel.setBounds(width / 2 - 160, height / 2 - 20, 320, 40);
+						window.add(errorLabel);
+						return;
+					}
+
+					JLabel nameLabel = new JLabel();
+					nameLabel.setText(gymResult.getString(1));
+					Font font = nameLabel.getFont();
+					nameLabel.setFont(new Font(font.getName(), font.getStyle(), font.getSize() * 2));
+					nameLabel.setBounds(20, 20, width - 20, 40);
+					window.add(nameLabel);
+
+					JLabel addressLabel = new JLabel();
+					addressLabel.setText(gymResult.getString(2));
+					addressLabel.setBounds(20, 60, width - 20, 20);
+					window.add(addressLabel);
+
+					JLabel zipcodeLabel = new JLabel();
+					zipcodeLabel.setText(gymResult.getString(3));
+					zipcodeLabel.setBounds(20, 80, width - 20, 20);
+					window.add(zipcodeLabel);
+
+					JLabel typeLabel = new JLabel();
+					typeLabel.setText("Type: " + gymResult.getString(4));
+					typeLabel.setBounds(20, 120, width - 20, 20);
+					window.add(typeLabel);
+					
+					JLabel hoursLabel = new JLabel();
+					hoursLabel.setText("Open: " + gymResult.getString(5));
+					hoursLabel.setBounds(20, 140, width - 20, 20);
+					window.add(hoursLabel);
+
+					JLabel equipmentLabel = new JLabel();
+					equipmentLabel.setText("Equipment: " + gymResult.getString(6));
+					equipmentLabel.setBounds(20, 160, width - 20, 20);
+					window.add(equipmentLabel);
+					
+					JPanel reviewPanel = new JPanel();
+					reviewPanel.setLayout(null);
+					JScrollPane reviewScroll = new JScrollPane();
+					reviewScroll.setBounds(width - 340, 60, 320, height - 80);
+					reviewScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+					reviewScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+					reviewScroll.setMaximumSize(new Dimension(width, height - 80));
+					window.add(reviewScroll);
+					
+					double avgRating = 0.0;
+					int ratingCount = 0;
+					int y = 0;
+					reviewResult = statement.executeQuery("SELECT rating, review, user_id FROM ratingsandreviews WHERE gym_id="+gymId);
+					while (reviewResult.next()) {
+						avgRating += (int)reviewResult.getObject(1);
+						++ratingCount;
+
+						Statement userStatement = connection.createStatement();
+						userResult = userStatement.executeQuery("SELECT email FROM users WHERE id="+reviewResult.getString(3));
+						String username;
+						if (userResult.next()) {
+							username = userResult.getString(1);
+						} else {
+							username = "[DELETED]";
+						}
+						
+						JLabel userLabel = new JLabel();
+						userLabel.setText(username);
+						userLabel.setBounds(10, 10 + y, 160, 20);
+						reviewPanel.add(userLabel);
+
+						JLabel ratingLabel = new JLabel();
+						ratingLabel.setText(reviewResult.getString(3));
+						ratingLabel.setBounds(280, 10 + y, 20, 20);
+						reviewPanel.add(ratingLabel);
+
+						JLabel reviewLabel = new JLabel();
+						reviewLabel.setText("<html>"+reviewResult.getString(2)+"</html>");
+						reviewLabel.setBounds(10, 10 + y, 300, 80);
+						reviewPanel.add(reviewLabel);
+						
+						y += 80;
+					}
+					if (ratingCount > 0) {
+						avgRating /= ratingCount;
+					}
+					reviewPanel.setPreferredSize(new Dimension(320, y));
+					reviewPanel.revalidate();
+					reviewPanel.repaint();
+					reviewScroll.setViewportView(reviewPanel);
+					reviewScroll.revalidate();
+					reviewScroll.repaint();
+
+					JLabel ratingLabel = new JLabel();
+					ratingLabel.setText(String.format("Rating: %.1f (%d Reviews)", avgRating, ratingCount));
+					ratingLabel.setBounds(20, 200, width - 20, 20);
+					window.add(ratingLabel);
 				} catch (SQLException ex) {
 					ex.printStackTrace();
+					JLabel errorLabel = new JLabel();
+					errorLabel.setText("Connection failed.");
+					errorLabel.setForeground(Color.RED);
+					errorLabel.setBounds(width / 2 - 160, height / 2 - 20, 320, 40);
+					window.add(errorLabel);
+					return;
 				}
 			}
-		});
+		}
+		window.revalidate();
+	}
+	
+	public static void openWindowContext() {
+		scene = Scene.Login;
 		
-		JButton button = new JButton();
-		button.setText("");
-		
+		JFrame window = new JFrame();
 		window.setTitle("Gym Rating System");
 		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		window.add(input, BorderLayout.NORTH);
-		window.add(scroll, BorderLayout.SOUTH);
-		window.setSize(1280, 720);
+		window.setBounds(0, 0, 1280, 720);
+		window.addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				loadScene(window, scene);
+			}
+		});
+		window.setContentPane(new JPanel(null));
+		
+		loadScene(window, Scene.Login);
+		
 		window.setVisible(true);
 	}
 }
