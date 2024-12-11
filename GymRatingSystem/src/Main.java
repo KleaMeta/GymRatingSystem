@@ -24,9 +24,9 @@ public class Main {
 	// As of yet the database has only been hosted locally, so these values are subject to change across devices.
 	// If you're using MySQL to host the database, the URL will be "jdbc:mysql://localhost:3306/gym_rating_system".
 	// The User and Password depend on your configuration of MySQL upon installation.
-	static final String URL = "jdbc:mysql://localhost:3306/gym_rating_system";
-	static final String USER = "root";
-	static final String PASSWORD = "SkibidiSigmas23!V5";
+	static final String URL = "";
+	static final String USER = "";
+	static final String PASSWORD = "";
 	// For obvious reasons the method for getting the password should be made more secure but I can't think of any good way to do that that wouldn't be overkill for this project.
 	
 	static Connection connection;
