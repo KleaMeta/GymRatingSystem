@@ -10,6 +10,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.math.BigInteger;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -24,19 +25,19 @@ public class Main {
 	// As of yet the database has only been hosted locally, so these values are subject to change across devices.
 	// If you're using MySQL to host the database, the URL will be "jdbc:mysql://localhost:3306/gym_rating_system".
 	// The User and Password depend on your configuration of MySQL upon installation.
-	static final String URL = "";
-	static final String USER = "";
-	static final String PASSWORD = "";
+	static final String URL = "jdbc:mysql://localhost:3306/gym_rating_system";
+	static final String USER = "root";
+	static final String PASSWORD = "SkibidiSigmas23!V5";
 	// For obvious reasons the method for getting the password should be made more secure but I can't think of any good way to do that that wouldn't be overkill for this project.
 	
 	static Connection connection;
 	static Statement statement;
 	
-	static Scene scene;
+	static Scenes scene;
 	static User user;
 	static int gymId;
 	
-	// Reformats the string to be handled safely in SQL.
+	// Reformats the string to be written safely to the SQL database.
 	static String safeFormat(String string) {
 		return string.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
 	}
@@ -65,15 +66,15 @@ public class Main {
 				switch (cmd) {
 					case "help" -> {
 						System.out.println("exit - Exit the program.");
-						System.out.println("login - Log in with a particular user.");
-						System.out.println("register - Register a new user.");
+						System.out.println("login - Log in with a particular user."); // Check!
+						System.out.println("register - Register a new user."); // Check!
 						System.out.println("query - (ADMIN) Make an SQL query to the database.");
 						System.out.println("update - (ADMIN) Push an SQL query to the database.");
-						System.out.println("add-gym - (ADMIN) Add a new gym to the database.");
-						System.out.println("remove-gym - (ADMIN) Remove a gym from the database.");
-						System.out.println("edit-gym - (ADMIN) Edit a gym in the database.");
+						System.out.println("add-gym - (ADMIN) Add a new gym to the database."); // Check!
+						System.out.println("remove-gym - (ADMIN) Remove a gym from the database."); // Check!
+						System.out.println("edit-gym - (ADMIN) Edit a gym in the database."); // Check!
 						System.out.println("gyms-in-my-area - (USER) View gyms in your zip code.");
-						System.out.println("review - (USER) Post a review for a Gym.");
+						System.out.println("review - (USER) Post a review for a Gym."); // Check!
 					}
 					case "exit" -> {
 						System.out.println("Exiting program.");
@@ -279,7 +280,8 @@ public class Main {
 		}
 	}
 	
-	public static void loadScene(JFrame window, Scene newScene) {
+	// Most spaghettified code in existence.
+	public static void loadScene(JFrame window, Scenes newScene) {
 		// Clear window.
 		Container pane = window.getContentPane();
 		while (pane.getComponentCount() > 0) { pane.remove(0); }
@@ -339,7 +341,7 @@ public class Main {
 						}
 						errorLabel.setText("Success!");
 						errorLabel.setForeground(Color.GREEN);
-						loadScene(window, Scene.Home);
+						loadScene(window, Scenes.Home);
 					}
 				});
 				window.add(loginButton);
@@ -360,7 +362,7 @@ public class Main {
 				registerButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.Register);
+						loadScene(window, Scenes.Register);
 					}
 				});
 				window.add(registerButton);
@@ -376,7 +378,7 @@ public class Main {
 				continueButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.HomeNoUser);
+						loadScene(window, Scenes.HomeNoUser);
 					}
 				});
 				window.add(continueButton);
@@ -438,7 +440,7 @@ public class Main {
 						}
 						errorLabel.setText("Success!");
 						errorLabel.setForeground(Color.GREEN);
-						loadScene(window, Scene.Login);
+						loadScene(window, Scenes.Login);
 					}
 				});
 				
@@ -448,7 +450,7 @@ public class Main {
 				backButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.Login);
+						loadScene(window, Scenes.Login);
 					}
 				});
 				window.add(backButton);
@@ -456,40 +458,26 @@ public class Main {
 			case Home -> {
 				JButton accountButton = new JButton();
 				accountButton.setText("Manage Account");
-				accountButton.setBounds(width - 160, 0, 160, 40);
+				accountButton.setBounds(width - 180, 20, 160, 40);
 				accountButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.Account);
+						loadScene(window, Scenes.Account);
 					}
 				});
 				window.add(accountButton);
 
 				JButton logoutButton = new JButton();
 				logoutButton.setText("Log Out");
-				logoutButton.setBounds(width - 160, 40, 160, 40);
+				logoutButton.setBounds(width - 180, 60, 160, 40);
 				logoutButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						user = null;
-						loadScene(window, Scene.Login);
+						loadScene(window, Scenes.Login);
 					}
 				});
 				window.add(logoutButton);
-				
-				if (user.isAdmin()) {
-					JButton adminButton = new JButton();
-					adminButton.setText("Admin Tools");
-					adminButton.setBounds(width - 160, 100, 160, 40);
-					adminButton.addActionListener(new ActionListener() {
-						@Override
-						public void actionPerformed(ActionEvent e) {
-							user = null;
-							loadScene(window, Scene.AdminTools);
-						}
-					});
-					window.add(adminButton);
-				}
 				
 				JButton gymsInZipCodeButton = new JButton();
 				gymsInZipCodeButton.setText("Gyms in your Zip Code");
@@ -502,7 +490,7 @@ public class Main {
 				searchButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.GymSearch);
+						loadScene(window, Scenes.GymSearch);
 					}
 				});
 				window.add(searchButton);
@@ -510,11 +498,11 @@ public class Main {
 			case HomeNoUser -> {
 				JButton loginButton = new JButton();
 				loginButton.setText("Log In");
-				loginButton.setBounds(width - 160, 0, 160, 40);
+				loginButton.setBounds(width - 180, 20, 160, 40);
 				loginButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.Login);
+						loadScene(window, Scenes.Login);
 					}
 				});
 				window.add(loginButton);
@@ -525,7 +513,7 @@ public class Main {
 				searchButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scene.GymSearch);
+						loadScene(window, Scenes.GymSearch);
 					}
 				});
 				window.add(searchButton);
@@ -535,34 +523,34 @@ public class Main {
 				listPanel.setLayout(null);
 				
 				JScrollPane scrollPane = new JScrollPane(listPanel);
-				scrollPane.setBounds(0, 80, width, height - 80);
+				scrollPane.setBounds(20, 100, width - 40, height - 120);
 				scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 				scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-				scrollPane.setMaximumSize(new Dimension(width, height - 80));
+				scrollPane.setMaximumSize(new Dimension(width - 40, height - 120));
 				window.add(scrollPane);
 				
 				JLabel searchLabel = new JLabel();
 				searchLabel.setText("Enter zip code, name, or desired equipment:");
-				searchLabel.setBounds(0, 0, width, 40);
+				searchLabel.setBounds(20, 40, width - 40, 20);
 				window.add(searchLabel);
 				
 				JButton backButton = new JButton();
 				backButton.setText("Back");
-				backButton.setBounds(width - 160, 0, 160, 40);
+				backButton.setBounds(width - 180, 20, 160, 40);
 				backButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						if (user == null) {
-							loadScene(window, Scene.HomeNoUser);
+							loadScene(window, Scenes.HomeNoUser);
 						} else {
-							loadScene(window, Scene.Home);
+							loadScene(window, Scenes.Home);
 						}
 					}
 				});
 				window.add(backButton);
 				
 				JTextField searchField = new JTextField();
-				searchField.setBounds(0, 40, width, 40);
+				searchField.setBounds(20, 70, width - 130, 20);
 				searchField.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
@@ -570,8 +558,11 @@ public class Main {
 						
 						int y = 0;
 						try {
-							ResultSet result = statement.executeQuery("SELECT id, name, address FROM gyms WHERE zip_code='"+searchField.getText()+"' OR name LIKE '%"+searchField.getText()+"%' OR type LIKE '%"+searchField.getText()+"%'");
+							ResultSet result = statement.executeQuery("SELECT id, name, address FROM gyms WHERE zip_code='"+searchField.getText()+"' OR name LIKE '%"+searchField.getText()+"%' OR equipment LIKE '%"+searchField.getText()+"%' ORDER BY name");
 							while (result.next()) {
+								// Allows admins to easily hide gyms while editing/creating them, making them only visible to other admins.
+								if (result.getString(2).startsWith("-hide-") && (user == null || !user.isAdmin())) { continue; }
+								
 								JLabel gymName = new JLabel();
 								gymName.setText(result.getString(2));
 								gymName.setBounds(20, 10 + y, width, 20);
@@ -586,15 +577,15 @@ public class Main {
 								JButton viewButton = new JButton();
 								viewButton.setText("Details");
 								if (user == null || !user.isAdmin()) {
-									viewButton.setBounds(width - 160, 10 + y, 120, 40);
+									viewButton.setBounds(width - 200, 10 + y, 120, 40);
 								} else {
-									viewButton.setBounds(width - 240, 10 + y, 120, 40);
+									viewButton.setBounds(width - 280, 10 + y, 120, 40);
 								}
 								viewButton.addActionListener(new ActionListener() {
 									@Override
 									public void actionPerformed(ActionEvent e) {
 										gymId = id;
-										loadScene(window, Scene.GymDetails);
+										loadScene(window, Scenes.GymDetails);
 									}
 								});
 								listPanel.add(viewButton);
@@ -602,19 +593,19 @@ public class Main {
 								if (user != null && user.isAdmin()) {
 									JButton editButton = new JButton();
 									editButton.setText("Edit");
-									editButton.setBounds(width - 120, 10 + y, 80, 20);
+									editButton.setBounds(width - 160, 10 + y, 80, 20);
 									editButton.addActionListener(new ActionListener() {
 										@Override
 										public void actionPerformed(ActionEvent e) {
 											gymId = id;
-											loadScene(window, Scene.GymEdit);
+											loadScene(window, Scenes.GymEdit);
 										}
 									});
 									listPanel.add(editButton);
 									
 									JButton deleteButton = new JButton();
 									deleteButton.setText("Delete");
-									deleteButton.setBounds(width - 120, 30 + y, 80, 20);
+									deleteButton.setBounds(width - 160, 30 + y, 80, 20);
 									deleteButton.addActionListener(new ActionListener() {
 										@Override
 										public void actionPerformed(ActionEvent e) {
@@ -623,7 +614,7 @@ public class Main {
 											} catch (SQLException ex) {
 												
 											}
-											loadScene(window, Scene.GymSearch);
+											loadScene(window, Scenes.GymSearch);
 										}
 									});
 									listPanel.add(deleteButton);
@@ -635,7 +626,31 @@ public class Main {
 							ex.printStackTrace();
 						}
 						
-						listPanel.setPreferredSize(new Dimension(width, y));
+						if (user != null && user.isAdmin()) {
+							JButton newButton = new JButton();
+							newButton.setText("Add New");
+							newButton.setBounds(width - 200, 10 + y, 120, 40);
+							newButton.addActionListener(new ActionListener() {
+								@Override
+								public void actionPerformed(ActionEvent e) {
+									try {
+										statement.executeUpdate("INSERT INTO gyms (name, address, zip_code, type, hours, equipment) VALUES ('-hide- New Gym', 'Address', 'Zip Code', 'Gym', 'Hours', 'Equipment')");
+										ResultSet nextIdResult = statement.executeQuery("SELECT LAST_INSERT_ID()");
+										if (!nextIdResult.next()) {
+											System.out.println("God damn it.");
+										}
+										BigInteger nextId = (BigInteger)nextIdResult.getObject(1);
+										gymId = nextId.intValue();
+										loadScene(window, Scenes.GymEdit);
+									} catch (SQLException ex) {
+										ex.printStackTrace();
+									}
+								}
+							});
+							listPanel.add(newButton);
+						}
+						
+						listPanel.setPreferredSize(new Dimension(width, (user != null && user.isAdmin()) ? (y + 60) : y));
 						listPanel.revalidate();
 						listPanel.repaint();
 						
@@ -647,18 +662,24 @@ public class Main {
 					}
 				});
 				window.add(searchField);
+				
+				JButton searchButton = new JButton();
+				searchButton.setText("Search");
+				searchButton.setBounds(width - 100, 70, 80, 20);
+				searchButton.addActionListener(searchField.getActionListeners()[0]);
+				window.add(searchButton);
 			}
 			case GymDetails -> {
 				JButton backButton = new JButton();
 				backButton.setText("Home");
-				backButton.setBounds(width - 160, 0, 160, 40);
+				backButton.setBounds(width - 180, 20, 160, 40);
 				backButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						if (user == null) {
-							loadScene(window, Scene.HomeNoUser);
+							loadScene(window, Scenes.HomeNoUser);
 						} else {
-							loadScene(window, Scene.Home);
+							loadScene(window, Scenes.Home);
 						}
 					}
 				});
@@ -711,10 +732,10 @@ public class Main {
 					JPanel reviewPanel = new JPanel();
 					reviewPanel.setLayout(null);
 					JScrollPane reviewScroll = new JScrollPane();
-					reviewScroll.setBounds(width - 340, 60, 320, height - 80);
+					reviewScroll.setBounds(width - 340, 80, 320, height - 100);
 					reviewScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 					reviewScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-					reviewScroll.setMaximumSize(new Dimension(width, height - 80));
+					reviewScroll.setMaximumSize(new Dimension(width, height - 100));
 					window.add(reviewScroll);
 					
 					double avgRating = 0.0;
@@ -740,13 +761,14 @@ public class Main {
 						reviewPanel.add(userLabel);
 
 						JLabel ratingLabel = new JLabel();
-						ratingLabel.setText(reviewResult.getString(3));
+						ratingLabel.setText(reviewResult.getString(1));
 						ratingLabel.setBounds(280, 10 + y, 20, 20);
 						reviewPanel.add(ratingLabel);
 
 						JLabel reviewLabel = new JLabel();
+						reviewLabel.setVerticalAlignment(SwingConstants.TOP);
 						reviewLabel.setText("<html>"+reviewResult.getString(2)+"</html>");
-						reviewLabel.setBounds(10, 10 + y, 300, 80);
+						reviewLabel.setBounds(10, 30 + y, 280, 50);
 						reviewPanel.add(reviewLabel);
 						
 						y += 80;
@@ -765,6 +787,157 @@ public class Main {
 					ratingLabel.setText(String.format("Rating: %.1f (%d Reviews)", avgRating, ratingCount));
 					ratingLabel.setBounds(20, 200, width - 20, 20);
 					window.add(ratingLabel);
+					
+					if (user != null) {
+						JLabel reviewPostLabel = new JLabel();
+						reviewPostLabel.setText("Leave a review!");
+						reviewPostLabel.setBounds(20, height - 420, 480, 20);
+						window.add(reviewPostLabel);
+
+						JLabel ratingPostLabel = new JLabel();
+						ratingPostLabel.setText("Your Rating (1-5): ");
+						ratingPostLabel.setBounds(20, height - 400, 480, 20);
+						window.add(ratingPostLabel);
+						
+						ButtonGroup ratingButtonGroup = new ButtonGroup();
+						JRadioButton ratingButtons[] = new JRadioButton[5];
+						for (int i = 0; i < 5; ++i) {
+							ratingButtons[i] = new JRadioButton();
+							ratingButtons[i].setBounds(160 + 20 * i, height - 400, 20, 20);
+							ratingButtonGroup.add(ratingButtons[i]);
+							window.add(ratingButtons[i]);
+						}
+						
+						JTextArea reviewField = new JTextArea();
+						reviewField.setText("Leave a review!");
+						reviewField.setBounds(30, height - 370, 460, 300);
+						window.add(reviewField);
+						
+						JButton reviewClearButton = new JButton();
+						reviewClearButton.setText("Clear");
+						reviewClearButton.setBounds(20, height - 60, 160, 40);
+						reviewClearButton.addActionListener(new ActionListener() {
+							@Override
+							public void actionPerformed(ActionEvent e) {
+								reviewField.setText("");
+							}
+						});
+						window.add(reviewClearButton);
+						
+						JButton reviewPostButton = new JButton();
+						reviewPostButton.setText("Post");
+						reviewPostButton.setBounds(340, height - 60, 160, 40);
+						reviewPostButton.addActionListener(new ActionListener() {
+							@Override
+							public void actionPerformed(ActionEvent e) {
+								try {
+									int i;
+									for (i = 0; i < 5; ++i) {
+										if (ratingButtons[i].isSelected()) {
+											break;
+										}
+									}
+									if (i == 5) {
+										return;
+									}
+									statement.executeUpdate("INSERT INTO ratingsandreviews (gym_id, user_id, rating, review) VALUES ("+gymId+", "+user.getId()+", "+(i+1)+", '"+safeFormat(reviewField.getText())+"')");
+									loadScene(window, scene);
+								} catch (SQLException ex) {
+									ex.printStackTrace();
+								}
+							}
+						});
+						window.add(reviewPostButton);
+					}
+				} catch (SQLException ex) {
+					ex.printStackTrace();
+					JLabel errorLabel = new JLabel();
+					errorLabel.setText("Connection failed.");
+					errorLabel.setForeground(Color.RED);
+					errorLabel.setBounds(width / 2 - 160, height / 2 - 20, 320, 40);
+					window.add(errorLabel);
+					break;
+				}
+			}
+			case GymEdit -> {
+				if (user == null || !user.isAdmin()) { break; }
+				JButton backButton = new JButton();
+				backButton.setText("Home");
+				backButton.setBounds(width - 180, 20, 160, 40);
+				backButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scenes.Home);
+					}
+				});
+				window.add(backButton);
+				
+				ResultSet gymResult;
+				try {
+					gymResult = statement.executeQuery("SELECT name, address, zip_code, type, hours, equipment FROM gyms WHERE id="+gymId);
+					if (!gymResult.next()) {
+						JLabel errorLabel = new JLabel();
+						errorLabel.setText("Connection failed.");
+						errorLabel.setForeground(Color.RED);
+						errorLabel.setBounds(width / 2 - 160, height / 2 - 20, 320, 40);
+						window.add(errorLabel);
+						return;
+					}
+
+					JTextField nameField = new JTextField();
+					nameField.setText(gymResult.getString(1));
+					Font font = nameField.getFont();
+					nameField.setFont(new Font(font.getName(), font.getStyle(), font.getSize() * 2));
+					nameField.setBounds(20, 20, 640, 40);
+					window.add(nameField);
+
+					JTextField addressField = new JTextField();
+					addressField.setText(gymResult.getString(2));
+					addressField.setBounds(20, 60, 320, 20);
+					window.add(addressField);
+
+					JTextField zipcodeField = new JTextField();
+					zipcodeField.setText(gymResult.getString(3));
+					zipcodeField.setBounds(20, 80, 320, 20);
+					window.add(zipcodeField);
+
+					JTextField typeField = new JTextField();
+					typeField.setText(gymResult.getString(4));
+					typeField.setBounds(20, 120, 320, 20);
+					window.add(typeField);
+					
+					JTextField hoursField = new JTextField();
+					hoursField.setText(gymResult.getString(5));
+					hoursField.setBounds(20, 140, 320, 20);
+					window.add(hoursField);
+
+					JTextField equipmentField = new JTextField();
+					equipmentField.setText(gymResult.getString(6));
+					equipmentField.setBounds(20, 160, 320, 20);
+					window.add(equipmentField);
+					
+					gymResult.close();
+					
+					JButton updateButton = new JButton();
+					updateButton.setText("Update");
+					updateButton.setBounds(20, 200, 160, 40);
+					updateButton.addActionListener(new ActionListener() {
+						@Override
+						public void actionPerformed(ActionEvent e) {
+							try {
+								statement.executeUpdate("UPDATE gyms SET name='"+safeFormat(nameField.getText())+"', address='"+safeFormat(addressField.getText())+"', zip_code='"+safeFormat(zipcodeField.getText())+"', type='"+safeFormat(typeField.getText())+"', hours='"+safeFormat(hoursField.getText())+"', equipment='"+safeFormat(equipmentField.getText())+"' WHERE id="+gymId);
+								loadScene(window, Scenes.GymDetails);
+							} catch (SQLException ex) {
+								ex.printStackTrace();
+								JLabel errorLabel = new JLabel();
+								errorLabel.setText("Update failed.");
+								errorLabel.setForeground(Color.RED);
+								errorLabel.setBounds(20, 240, 320, 20);
+								window.add(errorLabel);
+							}
+						}
+					});
+					window.add(updateButton);
 				} catch (SQLException ex) {
 					ex.printStackTrace();
 					JLabel errorLabel = new JLabel();
@@ -780,7 +953,7 @@ public class Main {
 	}
 	
 	public static void openWindowContext() {
-		scene = Scene.Login;
+		scene = Scenes.Login;
 		
 		JFrame window = new JFrame();
 		window.setTitle("Gym Rating System");
@@ -794,7 +967,7 @@ public class Main {
 		});
 		window.setContentPane(new JPanel(null));
 		
-		loadScene(window, Scene.Login);
+		loadScene(window, Scenes.Login);
 		
 		window.setVisible(true);
 	}
