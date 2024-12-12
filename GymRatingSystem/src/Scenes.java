@@ -1,8 +1,8 @@
+// Denotes the various Scenes that the application can be on.
 public enum Scenes {
 	Login,
 	Register,
 	Home,
-	HomeNoUser,
 	GymSearch,
 	GymDetails,
 	GymEdit,

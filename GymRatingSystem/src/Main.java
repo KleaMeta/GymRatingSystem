@@ -2,10 +2,8 @@ import java.sql.DriverManager;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
-import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
@@ -17,9 +15,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-
-import java.util.Scanner;
 
 public class Main {
 	// As of yet the database has only been hosted locally, so these values are subject to change across devices.
@@ -33,263 +28,50 @@ public class Main {
 	static Connection connection;
 	static Statement statement;
 	
-	static Scenes scene;
-	static User user;
-	static int gymId;
+	static Scenes scene; // Denotes the current screen of the application.
+	static User user; // Is null if no user is logged in, otherwise contains all relevant data about the user.
+	static int gymId; // Stores the ID of the currently viewed gym for easily loading on scene startup.
+	static String lastSearch; // Saves the last search made by the user so that it may be inputted automatically.
 	
 	// Reformats the string to be written safely to the SQL database.
 	static String safeFormat(String string) {
 		return string.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
 	}
 	
-	static String hash(String password) {
+	// Hashes the password for comparing to passwords inside the database. This is done to ensure that in the event of a database leak, passwords cannot be easily obtained for every user.
+	// However, I didn't bother actually hashing the password. But it can be done later on. This method is implemented everywhere a password is referenced.
+	public static String hash(String password) {
 		// A placeholder for an actually secure hash function later on.
 		return password;
 	}
 	
+	// The starting point of the program.
 	public static void main(String[] args) throws SQLException {
-		connection = DriverManager.getConnection(URL, USER, PASSWORD);
+		connection = DriverManager.getConnection(URL, USER, PASSWORD); // Establishes a connection route with the database.
 		statement = connection.createStatement();
 		user = null;
 		
+		// Initializes the window.
 		openWindowContext();
 	}
 	
-	public static void openCommandContext() throws SQLException {
-		Scanner scanner = new Scanner(System.in);
-		
-		String cmd;
-		while (true) {
-			System.out.print("> ");
-			cmd = scanner.nextLine();
-			try {
-				switch (cmd) {
-					case "help" -> {
-						System.out.println("exit - Exit the program.");
-						System.out.println("login - Log in with a particular user."); // Check!
-						System.out.println("register - Register a new user."); // Check!
-						System.out.println("query - (ADMIN) Make an SQL query to the database.");
-						System.out.println("update - (ADMIN) Push an SQL query to the database.");
-						System.out.println("add-gym - (ADMIN) Add a new gym to the database."); // Check!
-						System.out.println("remove-gym - (ADMIN) Remove a gym from the database."); // Check!
-						System.out.println("edit-gym - (ADMIN) Edit a gym in the database."); // Check!
-						System.out.println("gyms-in-my-area - (USER) View gyms in your zip code.");
-						System.out.println("review - (USER) Post a review for a Gym."); // Check!
-					}
-					case "exit" -> {
-						System.out.println("Exiting program.");
-						scanner.close();
-						return;
-					}
-					case "login" -> {
-						System.out.print("Email: ");
-						String email = scanner.nextLine();
-						System.out.print("Password: ");
-						String password = scanner.nextLine();
-						
-						ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email=\""+safeFormat(email)+"\"");
-						if (!result.next()) {
-							System.out.println("No user with this email exists.");
-							continue;
-						}
-						if (!hash(password).equals(result.getString(3))) {
-							System.out.println("Login failed.");
-							continue;
-						}
-						System.out.println("Login successful!");
-						user = new User((int)result.getObject(1), (String)result.getObject(2), (String)result.getObject(4), (boolean)result.getObject(5));
-					}
-					case "register" -> {
-						System.out.print("Email: ");
-						String email = scanner.nextLine();
-						System.out.print("Password: ");
-						String password = scanner.nextLine();
-						System.out.print("Zip Code: ");
-						String zipcode = scanner.nextLine();
-						
-						ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email='"+safeFormat(email)+"'");
-						if (result.next()) {
-							System.out.println("A user with this email already exists.");
-							continue;
-						}
-						
-						try {
-							statement.executeUpdate("INSERT INTO users (email, password, zip_code) VALUES ('"+safeFormat(email)+"', '"+safeFormat(hash(password))+"', '"+safeFormat(zipcode)+"')");
-						} catch (SQLException e) {
-							System.out.println("Failed to register new user.");
-							e.printStackTrace();
-							continue;
-						}
-						System.out.println("Registered new user! Don't forget to log in with it.");
-					}
-					case "query" -> {
-						if (user == null) {
-							System.out.println("You must be logged in to perform this action.");
-							continue;
-						}
-						if (!user.isAdmin()) {
-							System.out.println("You must be an admin to perform this action.");
-							continue;
-						}
-						
-						System.out.print("Query: ");
-						String query = scanner.nextLine();
-						
-						ResultSet result = statement.executeQuery(query);
-						ResultSetMetaData metadata = result.getMetaData();
-						int cols = metadata.getColumnCount();
-						for (int i = 1; i <= cols; ++i) {
-							System.out.printf("%-40s  ", metadata.getColumnName(i));
-						}
-						System.out.println();
-						while (result.next()) {
-							for (int i = 1; i <= cols; ++i) {
-								System.out.printf("%-40s  ", result.getString(i));
-							}
-							System.out.println();
-						}
-					}
-					case "update" -> {
-						if (user == null) {
-							System.out.println("You must be logged in to perform this action.");
-							continue;
-						}
-						if (!user.isAdmin()) {
-							System.out.println("You must be an admin to perform this action.");
-							continue;
-						}
-						
-						System.out.print("Query: ");
-						String query = scanner.nextLine();
-						
-						statement.executeUpdate(query);
-					}
-					case "add-gym" -> {
-						if (user == null) {
-							System.out.println("You must be logged in to perform this action.");
-							continue;
-						}
-						if (!user.isAdmin()) {
-							System.out.println("You must be an admin to perform this action.");
-							continue;
-						}
-						
-						System.out.print("Name: ");
-						String name = scanner.nextLine();
-						System.out.print("Address: ");
-						String address = scanner.nextLine();
-						System.out.print("Zip Code: ");
-						String zipcode = scanner.nextLine();
-						System.out.print("Type: ");
-						String type = scanner.nextLine();
-						System.out.print("Hours: ");
-						String hours = scanner.nextLine();
-						System.out.print("Equipment: ");
-						String equipment = scanner.nextLine();
-	
-						statement.executeUpdate("INSERT INTO gyms (name, address, zip_code, type, hours, equipment) VALUES ("+name+", "+address+", "+zipcode+", "+type+", "+hours+", "+equipment+")");
-						System.out.println("Gym added.");
-					}
-					case "remove-gym" -> {
-						if (user == null) {
-							System.out.println("You must be logged in to perform this action.");
-							continue;
-						}
-						if (!user.isAdmin()) {
-							System.out.println("You must be an admin to perform this action.");
-							continue;
-						}
-						
-						System.out.print("Gym ID: ");
-						String gym = scanner.nextLine();
-						
-						statement.executeUpdate("DELETE FROM gyms WHERE id="+gym);
-						System.out.println("Gym removed.");
-					}
-					case "gyms-in-my-area" -> {
-						if (user == null) {
-							System.out.println("You must be logged in to perform this action.");
-							continue;
-						}
-						
-						ResultSet result = statement.executeQuery("SELECT name, address, zip_code, type, hours, equipment FROM gyms WHERE zip_code='"+user.getZipCode()+"'");
-						ResultSetMetaData metadata = result.getMetaData();
-						int cols = metadata.getColumnCount();
-						for (int i = 1; i <= cols; ++i) {
-							System.out.printf("%-40s  ", metadata.getColumnName(i));
-						}
-						System.out.println();
-						while (result.next()) {
-							for (int i = 1; i <= cols; ++i) {
-								System.out.printf("%-40s  ", result.getString(i));
-							}
-							System.out.println();
-						}
-					}
-					case "review" -> {
-						if (user == null) {
-							System.out.println("You must be logged in to perform this action.");
-							continue;
-						}
-	
-						// Note: In the GUI context the users won't have to know the gym ID, and it'll be easier for the code to get on its own.
-						// I could have also had this be by name but two gyms with the same name could potentially exist so in the real program we will be retrieving it by ID.
-						System.out.println("Enter the ID of the gym you would like to review.");
-						System.out.print("Gym ID: ");
-						String gym = scanner.nextLine();
-						
-						ResultSet result = statement.executeQuery("SELECT * FROM gyms WHERE id="+gym);
-						if (!result.next()) {
-							System.out.println("No gym with that ID exists.");
-							continue;
-						}
-						
-						result = statement.executeQuery("SELECT * FROM ratingsandreviews WHERE user_id="+user.getId()+" AND gym_id="+gym);
-						if (result.next()) {
-							System.out.println("You've already posted a review for this gym. Would you like to replace it?");
-							System.out.print("Y/N: ");
-							String yorn = scanner.nextLine();
-							if (yorn.toUpperCase().equals("Y")) {
-								statement.executeUpdate("DELETE FROM ratingsandreviews WHERE id="+result.getString(1));
-							} else {
-								continue;
-							}
-						}
-						System.out.print("Rating: ");
-						String rating = scanner.nextLine();
-						System.out.println("Review (type \"END\" in a new line to end the review): ");
-						String review = "";
-						String reviewInput = scanner.nextLine();
-						if (!reviewInput.equals("END")) {
-							review = reviewInput;
-							reviewInput = scanner.nextLine();
-						}
-						while (!reviewInput.equals("END")) {
-							review += "\\r\\n" + safeFormat(reviewInput);
-							reviewInput = scanner.nextLine();
-						}
-						statement.executeUpdate("INSERT INTO ratingsandreviews (gym_id, user_id, rating, review) VALUES ("+gym+", "+user.getId()+", "+rating+", '"+review+"')");
-					}
-					default -> {
-						System.out.println("Command not recognized. Please try again.");
-					}
-				}
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
-	// Most spaghettified code in existence.
+	// Possibly the most spaghettified code in existence.
+	// This loads the various scenes to the open window.
 	public static void loadScene(JFrame window, Scenes newScene) {
 		// Clear window.
 		Container pane = window.getContentPane();
 		while (pane.getComponentCount() > 0) { pane.remove(0); }
-		window.setContentPane(new JPanel(null));
+		window.setContentPane(new JPanel(null)); // Setting the content pane to a JPanel with a null LayoutManager allows us to place objects directly at code-specified positions.
 		int width = window.getWidth() - 13; // Real width of displayed window.
 		int height = window.getHeight() - 35; // Real height of displayed window.
 		scene = newScene;
+		// Enhanced switch-cases my beloved.
+		// Doing this allows us to define separate scopes for each individual case, so we don't have to worry about repeating variable names and breaching scope.
+		// This switch in particular instructs the program to load the various elements depending on what scene is open.
+		// Also, we would have made these Scenes individual classes but since this is a fairly lightweight program, we figured this wouldn't be too much of a problem.
 		switch (newScene) {
+			// This screen allows users to log in, or continue without doing so.
+			// Additionally, they may click on the Register button to begin to register a new user.
 			case Login -> {
 				JLabel emailLabel = new JLabel();
 				emailLabel.setText("Enter your email:");
@@ -318,13 +100,14 @@ public class Main {
 				JButton loginButton = new JButton();
 				loginButton.setText("Log In");
 				loginButton.setBounds(width / 2 - 80, height / 4 + 100, 160, 20);
+				// In the case of buttons, the ActionListener allows us to supply a method to run on button click.
 				loginButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						String email = emailField.getText();
 						String password = new String(passwordField.getPassword());
 						try {
-							ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email=\""+safeFormat(email)+"\"");
+							ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email='"+safeFormat(email)+"'");
 							if (!result.next()) {
 								errorLabel.setText("No user with matching email found.");
 								return;
@@ -348,17 +131,17 @@ public class Main {
 
 				JLabel registerLabel1 = new JLabel();
 				registerLabel1.setText("No account?");
-				registerLabel1.setBounds(width / 2 - 80, height * 3 / 4, 160, 20);
+				registerLabel1.setBounds(width / 2 - 80, height * 3 / 4 - 60, 160, 20);
 				window.add(registerLabel1);
 
 				JLabel registerLabel2 = new JLabel();
 				registerLabel2.setText("Click here to make one:");
-				registerLabel2.setBounds(width / 2 - 80, height * 3 / 4 + 20, 160, 20);
+				registerLabel2.setBounds(width / 2 - 80, height * 3 / 4 - 20, 160, 20);
 				window.add(registerLabel2);
 				
 				JButton registerButton = new JButton();
 				registerButton.setText("Register");
-				registerButton.setBounds(width / 2 - 80, height * 3 / 4 + 40, 160, 20);
+				registerButton.setBounds(width / 2 - 80, height * 3 / 4, 160, 20);
 				registerButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
@@ -369,20 +152,21 @@ public class Main {
 				
 				JLabel continueLabel = new JLabel();
 				continueLabel.setText("Or continue without one:");
-				continueLabel.setBounds(width / 2 - 80, height * 3 / 4 + 60, 160, 20);
+				continueLabel.setBounds(width / 2 - 80, height * 3 / 4 + 40, 160, 20);
 				window.add(continueLabel);
 				
 				JButton continueButton = new JButton();
 				continueButton.setText("Continue");
-				continueButton.setBounds(width / 2 - 80, height * 3 / 4 + 80, 160, 20);
+				continueButton.setBounds(width / 2 - 80, height * 3 / 4 + 60, 160, 20);
 				continueButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scenes.HomeNoUser);
+						loadScene(window, Scenes.Home);
 					}
 				});
 				window.add(continueButton);
 			}
+			// This screen allows users to register their own new user, allowing them to post reviews for gyms.
 			case Register -> {
 				JLabel emailLabel = new JLabel();
 				emailLabel.setText("Enter your email:");
@@ -413,7 +197,7 @@ public class Main {
 				
 				JLabel errorLabel = new JLabel();
 				errorLabel.setText("");
-				errorLabel.setBounds(width / 2 - 100, height / 4 + 160, 200, 20);
+				errorLabel.setBounds(width / 2 - 100, height / 4 + 180, 200, 20);
 				errorLabel.setForeground(Color.RED);
 				window.add(errorLabel);
 				
@@ -426,6 +210,11 @@ public class Main {
 						String email = emailField.getText();
 						String password = new String(passwordField.getPassword());
 						String zipcode = zipcodeField.getText();
+						// Don't create a user with blank strings. We aren't making that mistake again.
+						if (email.isBlank() || password.isBlank() || zipcode.isBlank()) {
+							errorLabel.setText("Blank text fields.");
+							return;
+						}
 						try {
 							ResultSet result = statement.executeQuery("SELECT * FROM users WHERE email='"+safeFormat(email)+"'");
 							if (result.next()) {
@@ -443,6 +232,7 @@ public class Main {
 						loadScene(window, Scenes.Login);
 					}
 				});
+				window.add(registerButton);
 				
 				JButton backButton = new JButton();
 				backButton.setText("Go Back");
@@ -455,57 +245,43 @@ public class Main {
 				});
 				window.add(backButton);
 			}
+			// The home screen. From here users can either manage their account or search for new gyms.
 			case Home -> {
-				JButton accountButton = new JButton();
-				accountButton.setText("Manage Account");
-				accountButton.setBounds(width - 180, 20, 160, 40);
-				accountButton.addActionListener(new ActionListener() {
-					@Override
-					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scenes.Account);
-					}
-				});
-				window.add(accountButton);
+				if (user != null) {
+					JButton accountButton = new JButton();
+					accountButton.setText("Manage Account");
+					accountButton.setBounds(width - 180, 20, 160, 40);
+					accountButton.addActionListener(new ActionListener() {
+						@Override
+						public void actionPerformed(ActionEvent e) {
+							loadScene(window, Scenes.Account);
+						}
+					});
+					window.add(accountButton);
 
-				JButton logoutButton = new JButton();
-				logoutButton.setText("Log Out");
-				logoutButton.setBounds(width - 180, 60, 160, 40);
-				logoutButton.addActionListener(new ActionListener() {
-					@Override
-					public void actionPerformed(ActionEvent e) {
-						user = null;
-						loadScene(window, Scenes.Login);
-					}
-				});
-				window.add(logoutButton);
-				
-				JButton gymsInZipCodeButton = new JButton();
-				gymsInZipCodeButton.setText("Gyms in your Zip Code");
-				gymsInZipCodeButton.setBounds(width / 4 - 80, height * 3 / 4 - 20, 160, 40);
-				window.add(gymsInZipCodeButton);
-				
-				JButton searchButton = new JButton();
-				searchButton.setText("Search for Gyms");
-				searchButton.setBounds(width / 2 - 80, height * 3 / 4 - 20, 160, 40);
-				searchButton.addActionListener(new ActionListener() {
-					@Override
-					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scenes.GymSearch);
-					}
-				});
-				window.add(searchButton);
-			}
-			case HomeNoUser -> {
-				JButton loginButton = new JButton();
-				loginButton.setText("Log In");
-				loginButton.setBounds(width - 180, 20, 160, 40);
-				loginButton.addActionListener(new ActionListener() {
-					@Override
-					public void actionPerformed(ActionEvent e) {
-						loadScene(window, Scenes.Login);
-					}
-				});
-				window.add(loginButton);
+					JButton logoutButton = new JButton();
+					logoutButton.setText("Log Out");
+					logoutButton.setBounds(width - 180, 60, 160, 40);
+					logoutButton.addActionListener(new ActionListener() {
+						@Override
+						public void actionPerformed(ActionEvent e) {
+							user = null;
+							loadScene(window, Scenes.Login);
+						}
+					});
+					window.add(logoutButton);
+				} else {
+					JButton loginButton = new JButton();
+					loginButton.setText("Log In");
+					loginButton.setBounds(width - 180, 20, 160, 40);
+					loginButton.addActionListener(new ActionListener() {
+						@Override
+						public void actionPerformed(ActionEvent e) {
+							loadScene(window, Scenes.Login);
+						}
+					});
+					window.add(loginButton);
+				}
 				
 				JButton searchButton = new JButton();
 				searchButton.setText("Search for Gyms");
@@ -518,12 +294,17 @@ public class Main {
 				});
 				window.add(searchButton);
 			}
+			// This screen allows users to search for gyms by either Zip Code, Name, or Equipment.
+			// Admins can also edit, delete, or add new gyms from this screen.
 			case GymSearch -> {
+				// This was weird to get working, but we managed to get a panel that can be scrolled on.
 				JPanel listPanel = new JPanel();
-				listPanel.setLayout(null);
+				listPanel.setLayout(null); // Once again, the layout is set to null to allow us to place GUI elements at any location we desire.
 				
 				JScrollPane scrollPane = new JScrollPane(listPanel);
 				scrollPane.setBounds(20, 100, width - 40, height - 120);
+				// Lets the vertical scroll bar always be visible and the horizontal scroll bar never be visible.
+				// The pane looks neater this way.
 				scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 				scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 				scrollPane.setMaximumSize(new Dimension(width - 40, height - 120));
@@ -540,25 +321,23 @@ public class Main {
 				backButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						if (user == null) {
-							loadScene(window, Scenes.HomeNoUser);
-						} else {
-							loadScene(window, Scenes.Home);
-						}
+						loadScene(window, Scenes.Home);
 					}
 				});
 				window.add(backButton);
 				
 				JTextField searchField = new JTextField();
+				searchField.setText(lastSearch);
 				searchField.setBounds(20, 70, width - 130, 20);
+				// In the case of text fields, the ActionListener allows us to supply a method to run when pressing enter on the keyboard.
 				searchField.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
+						lastSearch = searchField.getText();
 						listPanel.removeAll();
-						
 						int y = 0;
 						try {
-							ResultSet result = statement.executeQuery("SELECT id, name, address FROM gyms WHERE zip_code='"+searchField.getText()+"' OR name LIKE '%"+searchField.getText()+"%' OR equipment LIKE '%"+searchField.getText()+"%' ORDER BY name");
+							ResultSet result = statement.executeQuery("SELECT id, name, address, zip_code FROM gyms WHERE zip_code='"+lastSearch+"' OR name LIKE '%"+lastSearch+"%' OR equipment LIKE '%"+lastSearch+"%' ORDER BY name");
 							while (result.next()) {
 								// Allows admins to easily hide gyms while editing/creating them, making them only visible to other admins.
 								if (result.getString(2).startsWith("-hide-") && (user == null || !user.isAdmin())) { continue; }
@@ -569,7 +348,7 @@ public class Main {
 								listPanel.add(gymName);
 								
 								JLabel gymAddress = new JLabel();
-								gymAddress.setText(result.getString(3));
+								gymAddress.setText(result.getString(3) + " (" + result.getString(4) + ")");
 								gymAddress.setBounds(20, 30 + y, width, 20);
 								listPanel.add(gymAddress);
 
@@ -663,12 +442,18 @@ public class Main {
 				});
 				window.add(searchField);
 				
+				// A search button exists too because it looks neater.
 				JButton searchButton = new JButton();
 				searchButton.setText("Search");
 				searchButton.setBounds(width - 100, 70, 80, 20);
+				// Copies the same method as in the search text field.
 				searchButton.addActionListener(searchField.getActionListeners()[0]);
 				window.add(searchButton);
+				
+				// Perform a search when the screen is loaded.
+				searchField.getActionListeners()[0].actionPerformed(null);
 			}
+			// This screen allows users to view more details about a specific gym.
 			case GymDetails -> {
 				JButton backButton = new JButton();
 				backButton.setText("Home");
@@ -676,11 +461,7 @@ public class Main {
 				backButton.addActionListener(new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						if (user == null) {
-							loadScene(window, Scenes.HomeNoUser);
-						} else {
-							loadScene(window, Scenes.Home);
-						}
+						loadScene(window, Scenes.Home);
 					}
 				});
 				window.add(backButton);
@@ -745,7 +526,8 @@ public class Main {
 					while (reviewResult.next()) {
 						avgRating += (int)reviewResult.getObject(1);
 						++ratingCount;
-
+						
+						// We need to create a new statement here, because two ResultSets cannot be active on the same statement.
 						Statement userStatement = connection.createStatement();
 						userResult = userStatement.executeQuery("SELECT email FROM users WHERE id="+reviewResult.getString(3));
 						String username;
@@ -754,6 +536,7 @@ public class Main {
 						} else {
 							username = "[DELETED]";
 						}
+						userStatement.close(); // Sure, close the Statement even though it closes automatically. Why not?
 						
 						JLabel userLabel = new JLabel();
 						userLabel.setText(username);
@@ -784,6 +567,7 @@ public class Main {
 					reviewScroll.repaint();
 
 					JLabel ratingLabel = new JLabel();
+					// Format the float to only have one decimal place.
 					ratingLabel.setText(String.format("Rating: %.1f (%d Reviews)", avgRating, ratingCount));
 					ratingLabel.setBounds(20, 200, width - 20, 20);
 					window.add(ratingLabel);
@@ -859,6 +643,7 @@ public class Main {
 					break;
 				}
 			}
+			// This screen allows admins to edit the details of gyms.
 			case GymEdit -> {
 				if (user == null || !user.isAdmin()) { break; }
 				JButton backButton = new JButton();
@@ -948,10 +733,109 @@ public class Main {
 					return;
 				}
 			}
+			// This screen allows users to manage their account, changing their email, zip code, or password.
+			case Account -> {
+				if (user == null) { break; }
+				JButton backButton = new JButton();
+				backButton.setText("Home");
+				backButton.setBounds(width - 180, 20, 160, 40);
+				backButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						loadScene(window, Scenes.Home);
+					}
+				});
+				window.add(backButton);
+				
+				JLabel emailLabel = new JLabel();
+				emailLabel.setText("Email: " + user.getEmail());
+				emailLabel.setBounds(20, 20, 320, 20);
+				window.add(emailLabel);
+
+				JTextField emailField = new JTextField();
+				emailField.setText(user.getEmail());
+				emailField.setBounds(20, 40, 320, 20);
+				window.add(emailField);
+				
+				JLabel zipcodeLabel = new JLabel();
+				zipcodeLabel.setText("Zip Code: " + user.getZipCode());
+				zipcodeLabel.setBounds(20, 80, 320, 20);
+				window.add(zipcodeLabel);
+
+				JTextField zipcodeField = new JTextField();
+				zipcodeField.setText(user.getZipCode());
+				zipcodeField.setBounds(20, 100, 320, 20);
+				window.add(zipcodeField);
+				
+				JLabel passwordLabel = new JLabel();
+				passwordLabel.setText("Change password?");
+				passwordLabel.setBounds(20, 140, 320, 20);
+				window.add(passwordLabel);
+
+				JPasswordField passwordField = new JPasswordField();
+				passwordField.setText("");
+				passwordField.setBounds(20, 160, 320, 20);
+				window.add(passwordField);
+				
+				JButton updateButton = new JButton();
+				updateButton.setText("Update");
+				updateButton.setBounds(20, 200, 160, 40);
+				updateButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						String email = emailField.getText();
+						String password = new String(passwordField.getPassword());
+						String zipcode = zipcodeField.getText();
+						if (email.isBlank() || zipcode.isBlank()) { return; }
+						
+						try {
+							if (password.isBlank()) {
+								// Don't update the password if it's left blank.
+								statement.executeUpdate("UPDATE users SET email='"+safeFormat(email)+"', zip_code='"+safeFormat(zipcode)+"' WHERE id="+user.getId());
+							} else {
+								// Otherwise, do!
+								statement.executeUpdate("UPDATE users SET email='"+safeFormat(email)+"', zip_code='"+safeFormat(zipcode)+"', password='"+safeFormat(password)+"' WHERE id="+user.getId());
+							}
+							loadScene(window, Scenes.Home);
+						} catch (SQLException ex) {
+							ex.printStackTrace();
+							JLabel errorLabel = new JLabel();
+							errorLabel.setText("Update failed.");
+							errorLabel.setForeground(Color.RED);
+							errorLabel.setBounds(20, 240, 320, 20);
+							window.add(errorLabel);
+						}
+					}
+				});
+				window.add(updateButton);
+				
+				JButton deleteButton = new JButton();
+				deleteButton.setText("Delete");
+				deleteButton.setBounds(200, 200, 160, 40);
+				deleteButton.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						try {
+							statement.executeUpdate("DELETE FROM users WHERE id="+user.getId());
+							user = null;
+							loadScene(window, Scenes.Home);
+						} catch (SQLException ex) {
+							ex.printStackTrace();
+							JLabel errorLabel = new JLabel();
+							errorLabel.setText("Update failed.");
+							errorLabel.setForeground(Color.RED);
+							errorLabel.setBounds(20, 240, 320, 20);
+							window.add(errorLabel);
+						}
+					}
+				});
+				window.add(deleteButton);
+			}
 		}
 		window.revalidate();
 	}
 	
+	// Initializes the window.
 	public static void openWindowContext() {
 		scene = Scenes.Login;
 		
@@ -959,13 +843,14 @@ public class Main {
 		window.setTitle("Gym Rating System");
 		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		window.setBounds(0, 0, 1280, 720);
+		// This tells the window to reload the current screen when resized.
 		window.addComponentListener(new ComponentAdapter() {
 			@Override
 			public void componentResized(ComponentEvent e) {
 				loadScene(window, scene);
 			}
 		});
-		window.setContentPane(new JPanel(null));
+		window.setContentPane(new JPanel(null)); // Setting the content pane to a JPanel with a null LayoutManager allows us to place objects directly at code-specified positions.
 		
 		loadScene(window, Scenes.Login);
 		
